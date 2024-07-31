@@ -1,0 +1,97 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class CurveMoveController : MonoBehaviour
+{
+    public enum EaseType
+    {
+        eet_EaseIn,
+        eet_EaseOut,
+        eet_EaseInOut,
+    }
+
+    //****输入参数****
+    Transform MoveTarget;
+    Vector3 Begin;
+    Vector3 End;
+    float MoveTime;
+    bool IsPingPongMove = false;
+    AnimationCurve CurrentCurve;
+    //***************
+
+    //标记是否完成动画
+    bool isFinish = true;
+    //长度向量
+    Vector3 distance;
+    //临时记录移动时间
+    float tempTime;
+    //ping true, pong false
+    bool pingPongState = true;
+
+    //三条曲线
+    public AnimationCurve easeIn;
+    public AnimationCurve easeOut;
+    public AnimationCurve easeInOut;
+
+    public void Move(GameObject gameObject, Vector3 begin, Vector3 end, float time, bool pingpong, EaseType easeType)
+    {
+        if (isFinish)
+        {
+            MoveTarget = gameObject.transform;
+            Begin = begin;
+            End = end;
+            MoveTime = time;
+            IsPingPongMove = pingpong;
+            distance = End - Begin;
+            isFinish = false;
+            tempTime = 0f;
+            pingPongState = true;
+            switch (easeType)
+            {
+                case EaseType.eet_EaseIn:
+                    CurrentCurve = easeIn;
+                    break;
+                case EaseType.eet_EaseOut:
+                    CurrentCurve = easeOut;
+                    break;
+                case EaseType.eet_EaseInOut:
+                    CurrentCurve = easeInOut;
+                    break;
+            }
+        }
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (!isFinish)
+        {
+            tempTime += Time.deltaTime;
+            tempTime = Mathf.Clamp(tempTime, 0f, MoveTime);
+            if (pingPongState)
+            {
+                MoveTarget.position = Begin +  distance * CurrentCurve.Evaluate(tempTime / MoveTime);
+            }
+            else
+            {
+                MoveTarget.position = End + distance * CurrentCurve.Evaluate(tempTime / MoveTime);
+            }
+
+            if (tempTime >= MoveTime)
+            {
+                if (!IsPingPongMove)
+                {
+                    isFinish = true;
+                    tempTime = 0f;
+                }
+                else
+                {
+                    distance = -1f * distance;
+                    tempTime = 0f;
+                    pingPongState = !pingPongState;
+                }
+            }
+        }
+    }
+}

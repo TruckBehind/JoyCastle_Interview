@@ -1,0 +1,150 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+//解题思路：利用四叉树这个数据结构，存储2D地图上数量庞大的物体，利用四叉树高效的查询效率，查询摄像机视野范围内的物体并显示。
+//地图系统，负责地图初始化，刷新视野范围内物体
+public class MapSystem 
+{
+    //场景内所有物体
+    public List<GameObject> AllObjects;
+    //当前视野内物体
+    public List<QuadTreeNode> CurAOIObjects;
+    //四叉树，存储场景内所有物体
+    QuadTree mQuadTree;
+
+    //初始化
+    public void Init()
+    {
+        mQuadTree = new QuadTree();
+        //区域范围设400，能容纳16w元素
+	mQuadTree.length = 400f;
+        //遍历场景内所有物体，构建四叉树，并默认隐藏
+	foreach(var obj in AllObjects)
+	{
+	    QuadTreeNode treeNode = new QuadTreeNode();
+	    treeNode.gameObject = obj;
+            treeNode.gameObject.SetActive(false);
+	    mQuadTree.Add(treeNode);
+	}
+    }
+
+    void OnCameraMove(Rect rect)
+    {
+        //查询当前视野内物体
+        List<QuadTreeNode> queryResult = mQuadTree.Query(rect);
+	List<QuadTreeNode> addObjs;
+	List<QuadTreeNode> removeObjs;
+        //对比旧视野内物体，取出新增物体addObjs和待消失物体removeObjs，addObjs全部显示，removeObjs全部隐藏
+	List<QuadTreeNode> diffList = GetDiff(queryResult, addObjs, removeObjs);
+        //更新当前视野内物体列表
+        CurAOIObjects = queryResult;
+    }
+
+    //对比旧视野内物体，取出新增物体addObjs和待消失物体removeObjs
+    void GetDiff(List<QuadTreeNode> newAOIObjects, List<QuadTreeNode> addObjs, List<QuadTreeNode> removeObjs);
+}
+
+//四叉树
+public class QuadTree
+{
+    //四个子节点，也是四叉树
+    QuadTree[] children = new QuadTree[4];
+    //四叉树范围宽度，初始为400，每多一层除以2
+    float length;
+    //四叉树范围
+    Rect bounds;
+    //当前四叉树存储的Node，不包含子节点中的Node
+    List<QuadTreeNode> nodes = new List<QuadTreeNode>(); 
+
+    //创建四叉树及其子节点，子节点范围为父节点的4分之一，直到范围小于2f后，不再细分
+    public QuadTree(float len)
+    {
+	length = len;
+	if(length >= 2f)
+	{
+	    children[0] = new QuadTree(length / 2f);
+	    children[1] = new QuadTree(length / 2f);
+	    children[2] = new QuadTree(length / 2f);
+	    children[3] = new QuadTree(length / 2f);
+        }
+    }
+
+    //添加Node
+    public void AddNode(QuadTreeNode treeNode)
+    {
+        //判断QuadTree范围是否为Node范围的2倍以上
+	if(treeNode.width *2f <= length && treeNode.height * 2f <= length)
+	{
+	   //根据treeNode中gameObject坐标获取所属象限
+	   int index;
+           //递归查找Node所属层级，直到找到正确的层级
+	   children[index].AddNode(treeNode);
+	}
+	else
+	{
+	   nodes.Add(treeNode);
+	}
+    }
+
+    //查询视野范围内Node
+    public List<QuadTreeNode> Query(Rect rect)
+    {
+        List<QuadTreeNode> queryList = new List<QuadTreeNode>;
+	//获取视野范围rect和当前四叉树范围的相交关系，1为不相交，2为视野范围包含四叉树范围， 3为视野范围跟四叉树范围相交或者包含于四叉树范围内
+	int intersect = GetInterSect(rect);
+	
+	if(intersect == 1)1 如果视野范围跟四叉树无交集，则返回一个空列表；
+	{
+	   return queryList;
+	}
+	else if(intersect == 2) //2 如果视野范围包含四叉树范围，则返回当前四叉树的nodes并递归返回所有子节点nodes
+	{
+	   queryList.AddRange(QueryAll());
+	   return queryList;
+	}
+	else if(intersect == 3)//3 如果视野范围跟四叉树范围相交或者包含于四叉树范围内，则递归查询所有子节点并返回当前四叉树的nodes
+
+	{
+	   queryList.AddRange(children[0].Query(rect));
+	   queryList.AddRange(children[1].Query(rect));
+	   queryList.AddRange(children[2].Query(rect));
+	   queryList.AddRange(children[3].Query(rect));
+
+	   foreach(var node in nodes)
+	   {
+	      //获取视野范围跟具体Node的相交关系，如果不相交为1，其他情况为2
+	      //如果为2，则queryList.Add(node);
+	   }
+	}
+    }
+
+    //获取该四叉树及其子节点的所有Node
+    public List<QuadTreeNode> QueryAll()
+    { 
+        List<QuadTreeNode> ret = new List<QuadTreeNode>();
+        ret.AddRange(children[0].QueryAll())
+	ret.AddRange(children[1].QueryAll())
+	ret.AddRange(children[2].QueryAll())
+	ret.AddRange(children[3].QueryAll())
+
+   	ret.AddRange(nodes);
+    }
+
+
+    //删除对应节点,这次暂时不用
+    public void RemoveNode(QuadTreeNode treeNode)
+    {
+	nodes.Remove(treeNode);
+    }
+
+    //更新节点，当gameObject位置发生变化时，需要调用，本次暂时无用
+    public void UpdateNode(QuadTreeNode treeNode);
+}
+
+public class QuadTreeNode
+{
+    public GameObject gameObject;
+    float height = 1f;
+    float width = 1f;
+}

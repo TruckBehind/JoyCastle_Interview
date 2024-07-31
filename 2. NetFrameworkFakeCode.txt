@@ -1,0 +1,107 @@
+using UnityEngine;
+using System.Collections;
+using System;
+
+//解体思路：网络消息收发，起两个线程，一个负责发送，一个负责接收。
+public class NetFrameworkFakeCode : MonoBehaviour
+{
+    SocketClient socketClient;
+    public Action<IRecvData> OnRecvData;
+
+    private void Start()
+    {
+        socketClient = new SocketClient();
+        socketClient.Start("ip",80);
+    }
+
+    //利用MonoBehaviour的Update，把收到消息的消费转到主线程
+    void Update()
+    {
+        lock(socketClient.RecvQueue)
+        {
+            IRecvData recvData = socketClient.RecvQueue.Dequeue();
+            //收到的消息数据，派发给各个业务模块
+            OnRecvData?.Invoke(recvData);
+        }
+    }
+
+    public void SendMsg(ISendData sendData)
+    {
+        socketClient.SendMsg(sendData);
+    }
+}
+
+public class SocketClient
+{
+    Socket socket;
+    public Queue<ISendData> SendQueue;
+    public Queue<IRecvData> RecvQueue;
+
+
+    public void Start(string ip,int port)
+    {
+        //创建链接，伪代码，应该是异步
+        socket = new Socket(ip ,port);
+        socket.Connect();
+
+        //伪代码，启动收发线程
+        StartThread(SendMsgThread).Start();
+        StartThread(RecvMsgThread).Start();
+    }
+
+    //发送线程
+    void SendMsgThread()
+    {
+        while(true)
+        {
+            if(SendQueue.Count > 0)
+            {
+                ISendData sendData = null;
+                lock(SendQueue)
+                {
+                    sendData = SendQueue.Dequeue();
+                }
+                byte[] data = sendData.Encode(sendData);
+                socket.Send(data);
+            }
+        }
+    }
+
+    //收取线程
+    void RecvMsgThread()
+    {
+        while(true)
+        {
+            //伪代码，实际这里需要处理连包的情况，这里假设每次收到的都是独立完整的一个消息
+            byte[] data= socket.receive();
+            IRecvData recvData = Decode(data);
+            lock(RecvQueue)
+            {
+                RecvQueue.Enqueue(recvData);
+            }
+        }
+    }
+
+    IRecvData Decode(byte[] data)
+    {
+        //协议解析，具体就不写了，取决用什么协议
+    }
+
+    public void SendMsg(ISendData sendData)
+    {
+        lock(SendQueue)
+        {
+            SendQueue.Enqueue(sendData);
+        }
+    }
+}
+
+public interface ISendData
+{
+    byte[] Encode(object data);
+}
+
+public interface IRecvData
+{
+    object Decode(byte[] data);
+}

@@ -1,0 +1,76 @@
+using UnityEngine;
+using System.Collections;
+using System;
+
+public class MoveController : MonoBehaviour
+{
+    //****输入参数****
+    Transform MoveTarget;
+    Vector3 Begin;
+    Vector3 End;
+    float MoveTime;
+    bool IsPingPongMove = false;
+    //***************
+
+    //标记是否完成动画
+    bool isFinish = true;
+    //移动速度
+    Vector3 V;
+    //临时记录移动时间
+    float tempTime;
+    //ping true, pong false
+    bool pingPongState = true;
+
+
+    public void Move(GameObject gameObject, Vector3 begin, Vector3 end, float time, bool pingpong)
+    {
+        if(isFinish)
+        {
+            MoveTarget = gameObject.transform;
+            Begin = begin;
+            End = end;
+            MoveTime = time;
+            IsPingPongMove = pingpong;
+            V = (End - Begin)/time;
+            isFinish = false;
+            tempTime = 0f;
+            pingPongState = true;
+        }
+    }
+
+
+    // Update is called once per frame
+    void Update()
+    {
+        if(!isFinish)
+        {
+            tempTime += Time.deltaTime;
+            tempTime = Mathf.Clamp(tempTime, 0f, MoveTime);
+            if (pingPongState)
+            {
+                MoveTarget.position = Begin + tempTime * V;
+            }
+            else
+            {
+                MoveTarget.position = End + tempTime * V;
+            }
+            
+            if(tempTime >= MoveTime)
+            {
+                if(!IsPingPongMove)
+                {
+                    isFinish = true;
+                    tempTime = 0f;
+                }
+                else
+                {
+                    V = -1f * V;
+                    tempTime = 0f;
+                    pingPongState = !pingPongState;
+                }
+            }
+        }
+    }
+
+   
+}
